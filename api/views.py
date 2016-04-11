@@ -28,8 +28,8 @@ class GetKeyView(View):
         try:
             UserKey.objects.create(key=key, session=session_key)
         except IntegrityError:
-            pass
-        return JsonResponse({'key': key.value})
+            pass #should log this error
+        return JsonResponse({'key': key.value}, status=200)
 
 
 class RepayKeyView(View):
@@ -41,19 +41,22 @@ class RepayKeyView(View):
         try:
             key = Key.objects.get(value=key_value)
         except ObjectDoesNotExist:
-            return JsonResponse({'message': 'There is no such key - {} '.format(key_value)}, status=200)
+            return JsonResponse({'message': u'There is no such key - {} '.format(key_value)}, status=404)
 
         user_key = UserKey.objects.filter(key=key).first()
+        if not user_key:
+            return JsonResponse({'message': u'This key {} can not be repaid, '
+                                            u'because it is still not issued'.format(key_value)})
         if user_key and user_key.session != session:
-            return JsonResponse({'message': 'You are not allow to repay this key'}, status=403)
+            return JsonResponse({'message': u'You are not allow to repay this key'}, status=403)
 
         if user_key and user_key.session == session:
             if key.status == Key.ISSUED:
                 key.status = Key.REPAID
                 key.save()
-                return JsonResponse({'message': 'The key - {} has been repaid'.format(key)}, status=200)
+                return JsonResponse({'message': u'The key - {} has been repaid'.format(key)}, status=200)
             else:
-                return JsonResponse({'message': 'The key - {} already repaid'.format(key)}, status=200)
+                return JsonResponse({'message': u'The key - {} already repaid'.format(key)}, status=200)
 
 
 class KeyStatusView(View):
@@ -63,13 +66,13 @@ class KeyStatusView(View):
         try:
             key = Key.objects.get(value=key)
         except ObjectDoesNotExist:
-            return JsonResponse({'status': 'No such key in system'})
+            return JsonResponse({'status': u'No such key in system'}, status=404)
 
-        return JsonResponse({'status': 'Key status is {}'.format(key.status)})
+        return JsonResponse({'status': u'Key status is {}'.format(key.status)}, status=200)
 
 
 class KeyInfoView(View):
 
     def get(self, *args, **kwargs):
-        return JsonResponse({'status': 'Amount of not issued keys: {}'.format(
-            Key.objects.filter(status=Key.NOT_ISSUED).count())})
+        return JsonResponse({'message': u'Amount of not issued keys: {}'.format(
+            Key.objects.filter(status=Key.NOT_ISSUED).count())}, status=200)
